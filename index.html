@@ -1,0 +1,1397 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<title>津軽為信の野望</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<style>
+/* ── FC パレット ─────────────────── */
+:root{
+  --bg:    #0a0c10;
+  --panel: #0e1218;
+  --line:  #2a3848;
+  --ink:   #c8dce8;
+  --dim:   #5a7888;
+  --snow:  #e8f4ff;
+  --ice:   #90bcd8;
+  --gold:  #d8b030;
+  --red:   #d04040;
+  --blue:  #3a7acc;
+  --green: #388858;
+  --cold:  #5aaac8;
+  --bliz:  #a8d0ec;
+  --warn:  #c07820;
+  --purp:  #7855a8;
+
+  /* FC国色（大名ごとの塗り分け） */
+  --c-player:  #0c2240;
+  --c-vassal:  #0c2818;
+  --c-ally:    #181c28;
+  --c-enemy:   #1a1010;
+  --c-sel:     #182840;
+
+  --b-player:  #3a8acc;
+  --b-vassal:  #38aa58;
+  --b-ally:    #4a6070;
+  --b-enemy:   #3a2020;
+  --b-sel:     #c8dce8;
+  --b-target:  #d04040;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{
+  min-height:100%;background:var(--bg);color:var(--ink);
+  font-family:ui-monospace,Consolas,"MS Gothic",monospace;font-size:15px;
+}
+#outer{max-width:1280px;margin:0 auto;padding:6px 8px}
+
+/* ── 雪 ─────────────────────────── */
+@keyframes sf{
+  0%  {transform:translateY(-10px) translateX(0);opacity:0}
+  10% {opacity:.8}
+  90% {opacity:.5}
+  100%{transform:translateY(100vh) translateX(25px);opacity:0}
+}
+.snowflake{position:fixed;pointer-events:none;color:var(--ice);z-index:200;animation:sf linear infinite}
+
+/* ── ヘッダー行 ──────────────────── */
+#header{
+  display:flex;align-items:center;justify-content:space-between;
+  border:2px solid var(--line);background:var(--panel);
+  padding:8px 14px;margin-bottom:6px;
+}
+.logo{font-size:1.55rem;color:var(--snow);letter-spacing:.18em;
+      text-shadow:0 0 18px #3a7acc88,2px 2px 0 #000}
+.logo-sub{font-size:.82rem;color:var(--ice);letter-spacing:.14em;margin-top:2px}
+#header-right{text-align:right;font-size:.8rem;color:var(--dim);line-height:1.7}
+
+/* ── 季節バナー ──────────────────── */
+#season-banner{
+  text-align:center;font-size:.92rem;padding:5px 10px;margin-bottom:6px;
+  border:1px solid var(--line);letter-spacing:.12em;transition:background .8s,color .8s;
+}
+#season-banner.spring  {background:#081410;color:#70c870;border-color:#285028}
+#season-banner.summer  {background:#080e08;color:#98d068;border-color:#284018}
+#season-banner.autumn  {background:#140a04;color:#d08838;border-color:#582808}
+#season-banner.winter  {background:#04080e;color:var(--ice);border-color:#182838}
+#season-banner.blizzard{background:#020608;color:var(--bliz);border-color:#082038;
+  animation:blizPulse 1.8s infinite}
+@keyframes blizPulse{0%,100%{opacity:1}50%{opacity:.55}}
+
+/* ── ステータスバー ──────────────── */
+#statusbar{
+  display:grid;grid-template-columns:repeat(8,1fr);gap:4px;margin-bottom:6px;
+}
+.stat{border:1px solid var(--line);background:#080c12;padding:5px 4px;text-align:center}
+.stat .lbl{font-size:.7rem;color:var(--dim);display:block}
+.stat .val{font-weight:bold;color:var(--cold);font-size:1.0rem;display:block}
+.stat.warn  .val{color:var(--warn)}
+.stat.hi    .val{color:var(--green)}
+.stat.danger .val{color:var(--red);animation:dpulse 1s infinite}
+@keyframes dpulse{0%,100%{opacity:1}50%{opacity:.35}}
+
+/* ゲージ行 */
+#gauges{display:flex;gap:12px;margin-bottom:6px;font-size:.82rem;align-items:center}
+.gauge-wrap{flex:1}
+.gauge-lbl{color:var(--dim);margin-bottom:2px}
+.gauge-bar{height:6px;background:#080c12;border:1px solid var(--line)}
+.gauge-bar i{display:block;height:100%;transition:width .5s}
+#cold-bar i {background:var(--cold)}
+#nanbu-bar i{background:var(--red)}
+
+/* ── フェイズバー ────────────────── */
+#phasebar{
+  display:flex;border:1px solid var(--line);margin-bottom:6px;
+}
+.ph{
+  flex:1;text-align:center;padding:6px 2px;font-size:.82rem;
+  background:#060a0e;color:var(--dim);border-right:1px solid var(--line);
+  transition:background .15s;cursor:default;
+}
+.ph:last-child{border-right:none}
+.ph.active{background:#0c1e38;color:var(--snow);font-weight:bold}
+.ph.done  {background:#060808;color:#2a3a48}
+.ph .pn   {font-size:.65rem;display:block;opacity:.55}
+
+/* ── メインレイアウト ────────────── */
+#main{display:grid;grid-template-columns:1fr 300px;gap:8px;align-items:start}
+
+/* ── 奥羽マップ ──────────────────── */
+#map-wrap{border:2px solid var(--line);background:#060a10;padding:10px}
+#map-title{
+  color:var(--cold);font-size:.88rem;letter-spacing:.15em;
+  border-bottom:1px solid var(--line);padding-bottom:5px;margin-bottom:10px;
+}
+
+/* SVGベース地図グリッド */
+#province-grid{
+  display:grid;
+  /* 奥羽の地理的配置：3列×4行ほど */
+  grid-template-columns: 180px 180px 180px;
+  grid-template-rows:    auto auto auto auto;
+  gap:6px;
+  justify-content:center;
+}
+
+/* 国ブロック本体（FC不如帰風：大きめ・色面が主役） */
+.prov{
+  border:3px solid var(--b-enemy);
+  background:var(--c-enemy);
+  padding:12px 10px 10px;
+  cursor:pointer;
+  transition:border-color .1s, background .1s;
+  position:relative;
+  min-height:96px;
+  user-select:none;
+}
+.prov:hover{filter:brightness(1.18)}
+.prov.player{border-color:var(--b-player);background:var(--c-player)}
+.prov.vassal{border-color:var(--b-vassal);background:var(--c-vassal)}
+.prov.ally  {border-color:var(--b-ally)  ;background:var(--c-ally)  }
+.prov.enemy {border-color:var(--b-enemy) ;background:var(--c-enemy) }
+.prov.sel   {border-color:var(--b-sel)!important;background:var(--c-sel)!important;
+             box-shadow:0 0 12px #5aaac844}
+.prov.target{border-color:var(--b-target)!important;
+             animation:targetBlink .7s infinite}
+@keyframes targetBlink{0%,100%{border-color:var(--b-target)}50%{border-color:#ff7070}}
+.prov.frozen{opacity:.75;border-style:dashed}
+
+/* 国名（でかく） */
+.prov-name{
+  font-size:1.45rem;font-weight:bold;color:var(--snow);
+  letter-spacing:.1em;line-height:1;margin-bottom:4px;
+  text-shadow:1px 1px 0 #000;
+}
+/* 大名名 */
+.prov-lord{
+  font-size:.82rem;color:var(--ice);
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+  margin-bottom:6px;
+}
+/* 自/敵タグ */
+.prov-tag{
+  position:absolute;top:7px;right:8px;
+  font-size:.72rem;padding:1px 6px;
+  border:1px solid currentColor;
+}
+.prov-tag.self  {color:var(--blue)}
+.prov-tag.vassal{color:var(--green)}
+.prov-tag.ally  {color:#6a9ab8}
+.prov-tag.enemy {color:#aa5050}
+/* 兵力バー */
+.prov-bar{height:4px;background:#0a1020;margin-top:2px;border:1px solid #1a2a3a}
+.prov-bar i{display:block;height:100%;background:var(--cold);transition:width .3s}
+/* 吹雪マーク */
+.prov.bliz::after{
+  content:'❄';position:absolute;bottom:6px;right:8px;
+  font-size:1.0rem;color:var(--bliz);opacity:.8;
+}
+/* 選択ハイライト矢印 */
+.prov.sel::before{
+  content:'►';position:absolute;left:-18px;top:50%;transform:translateY(-50%);
+  color:var(--snow);font-size:.9rem;
+}
+/* 兵数表示 */
+.prov-sol{
+  font-size:.88rem;color:var(--ice);
+}
+.prov-sol span{color:var(--snow);font-weight:bold}
+
+/* 蝦夷は小さめ別枠 */
+.prov.ezo{
+  min-height:64px;border-style:dashed;
+  background:#04080c;border-color:#2a5040;
+}
+.prov.ezo .prov-name{font-size:1.1rem;color:#70b8a0}
+
+/* ── 右カラム ────────────────────── */
+#right{display:flex;flex-direction:column;gap:7px}
+
+/* 汎用パネル */
+.fc{border:1px solid var(--line);background:var(--panel);padding:10px}
+.ttl{
+  color:var(--cold);font-size:.88rem;font-weight:bold;letter-spacing:.12em;
+  border-bottom:1px solid var(--line);padding-bottom:4px;margin-bottom:8px;
+}
+
+/* 評定パネル */
+.phase-hint{
+  font-size:.82rem;color:var(--ink);background:#060a0e;
+  border-left:3px solid var(--line);padding:4px 8px;margin-bottom:8px;line-height:1.55;
+}
+.group{border:1px solid var(--line);padding:7px;background:#060a0e;margin-bottom:5px}
+.gttl{font-size:.75rem;color:var(--dim);margin-bottom:5px;letter-spacing:.08em}
+.row{display:flex;flex-wrap:wrap;gap:4px;align-items:center}
+
+/* ボタン */
+button,select{
+  font-family:inherit;background:#08101a;color:var(--ink);
+  border:1px solid var(--line);padding:6px 10px;cursor:pointer;
+  font-size:.85rem;transition:background .1s;
+}
+button:hover  {background:#0c1a2c;color:var(--snow)}
+button:active {transform:translateY(1px)}
+button:disabled{opacity:.3;cursor:not-allowed}
+button.red    {border-color:var(--red);color:#ffaaaa}
+button.blue   {border-color:var(--blue);color:#aaccee}
+button.green  {border-color:var(--green);color:#aaeebb}
+button.gold   {background:#100e04;color:var(--gold);border-color:var(--gold);font-weight:bold}
+button.purp   {border-color:var(--purp);color:#ccaaee}
+button.snow   {border-color:var(--bliz);color:var(--bliz);background:#040810}
+button.ezo-btn{border-color:#70b8a0;color:#70b8a0;background:#040c0a}
+button.sm     {padding:4px 7px;font-size:.78rem}
+.small{font-size:.78rem;color:var(--dim);line-height:1.5}
+
+/* 武将リスト */
+.officers{max-height:160px;overflow-y:auto}
+.off{
+  display:grid;grid-template-columns:1fr auto;gap:4px;
+  border-bottom:1px solid #0e1820;padding:5px 4px;
+  font-size:.8rem;align-items:center;
+}
+.off-name{font-weight:bold;color:var(--snow)}
+.off-where{font-size:.72rem;color:var(--dim)}
+.off-stats{font-size:.75rem;color:var(--dim)}
+.lo{color:var(--red)}.hi{color:var(--green)}
+
+/* ログ */
+#log{
+  height:200px;overflow-y:auto;background:#04080c;
+  border:1px solid var(--line);padding:7px;
+  font-size:.8rem;line-height:1.65;
+}
+.l{border-bottom:1px dotted #0e1820;padding:2px 0}
+.win{color:#7ac8e8}.loss{color:#ff8888}.evt{color:#68c8d8}
+.dip{color:#88cc99}.warn{color:#ddaa55}.snow-log{color:var(--bliz)}.famine{color:#cc7722}
+
+/* 国情ポップアップ */
+#info-popup{
+  display:none;position:fixed;inset:0;background:rgba(0,0,0,.82);
+  z-index:100;align-items:center;justify-content:center;
+}
+#info-popup.show{display:flex}
+#info-box{
+  border:2px solid var(--cold);background:#080e16;
+  padding:22px 28px;min-width:340px;max-width:480px;
+  box-shadow:0 0 30px #3a7acc44;
+}
+#info-box .ib-head{
+  display:flex;justify-content:space-between;align-items:baseline;
+  margin-bottom:10px;border-bottom:1px solid var(--line);padding-bottom:8px;
+}
+#info-box .ib-name{font-size:1.3rem;font-weight:bold;color:var(--snow)}
+#info-box .ib-tag {font-size:.8rem;padding:2px 7px;border:1px solid currentColor}
+.ib-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:4px;margin-bottom:10px}
+.ib-cell{background:#060a12;border:1px solid var(--line);padding:5px 4px;text-align:center}
+.ib-cell .dl{font-size:.68rem;color:var(--dim);display:block}
+.ib-cell .dv{font-weight:bold;color:var(--cold);font-size:.95rem;display:block}
+.ib-advice{
+  background:#040c14;border-left:3px solid var(--cold);
+  padding:6px 10px;font-size:.82rem;color:var(--snow);line-height:1.6;margin-bottom:10px;
+}
+.ib-off{font-size:.78rem;color:var(--ice);line-height:1.7}
+.ib-adj{font-size:.78rem;color:var(--dim);margin-top:5px;line-height:1.6}
+
+/* 戦闘結果 */
+#battle-box{display:none;background:#06080e;border:2px solid var(--red);padding:10px}
+#battle-box.show{display:block}
+.bt-title{font-size:1.1rem;font-weight:bold;letter-spacing:.1em;margin-bottom:7px}
+.bt-win{color:var(--cold)}.bt-loss{color:var(--red)}
+.bt-cols{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:7px;font-size:.82rem}
+.bt-side b{display:block;color:var(--dim);margin-bottom:3px}
+.bbar{height:5px;background:#08101a;margin:2px 0}
+.bbar i{display:block;height:100%}
+.bbar.atk i{background:var(--blue)}.bbar.def i{background:var(--red)}.bbar.mo i{background:var(--cold)}
+.bt-desc{font-size:.8rem;color:var(--snow);line-height:1.6}
+
+/* チート */
+#cheat-box{display:none;border:1px solid var(--purp);background:#08001a;padding:7px;margin-bottom:5px}
+#cheat-box.open{display:block}
+
+/* 音ボタン */
+#audio-btn{position:absolute;right:10px;top:8px;font-size:.75rem;
+           border-color:var(--ice);color:var(--ice);background:#030810}
+#header{position:relative}
+
+/* エンディング */
+.overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.92);
+         z-index:150;align-items:center;justify-content:center}
+.overlay.show{display:flex}
+.obox{border:2px solid var(--cold);background:#06080e;padding:40px 56px;
+      text-align:center;box-shadow:0 0 40px #3a7acc44;max-width:460px}
+.otitle{font-size:1.9rem;color:var(--snow);letter-spacing:.22em;margin-bottom:10px;
+        text-shadow:0 0 20px var(--cold)}
+.omsg{color:var(--ice);margin-bottom:20px;font-size:.9rem;line-height:1.9}
+
+/* スノーコンテナ */
+#snow-layer{pointer-events:none}
+
+@media(max-width:860px){
+  #main{grid-template-columns:1fr}
+  #province-grid{grid-template-columns:1fr 1fr}
+  #statusbar{grid-template-columns:repeat(4,1fr)}
+  .prov-name{font-size:1.2rem}
+}
+</style>
+</head>
+<body>
+<div id="snow-layer"></div>
+
+<div id="outer">
+
+  <!-- ヘッダー -->
+  <div id="header">
+    <div>
+      <div class="logo">津軽為信の野望</div>
+      <div class="logo-sub">❄ 奥羽十国 天正の動乱 ❄</div>
+    </div>
+    <div id="header-right">
+      南部の家臣から謀反独立。奥羽を統べよ。
+    </div>
+    <button id="audio-btn" class="sm" onclick="toggleAudio()">♪ 音ON</button>
+  </div>
+
+  <!-- 季節バナー -->
+  <div id="season-banner" class="winter">天正元年　冬　― 津軽は雪に閉ざされている ―</div>
+
+  <!-- ステータスバー -->
+  <div id="statusbar"></div>
+
+  <!-- ゲージ -->
+  <div id="gauges">
+    <div class="gauge-wrap">
+      <div class="gauge-lbl">寒冷度 <span id="cold-val">0</span>　<span id="cold-lbl" style="color:var(--ice)">―</span></div>
+      <div class="gauge-bar" id="cold-bar"><i style="width:0%"></i></div>
+    </div>
+    <div class="gauge-wrap">
+      <div class="gauge-lbl" style="color:#cc6666">南部の圧力 <span id="nanbu-val">0</span></div>
+      <div class="gauge-bar" id="nanbu-bar"><i style="width:0%"></i></div>
+    </div>
+  </div>
+
+  <!-- フェイズバー -->
+  <div id="phasebar"></div>
+
+  <!-- メイン -->
+  <div id="main">
+
+    <!-- 左：地図 -->
+    <div class="fc" id="map-wrap">
+      <div id="map-title">◆ 奥羽諸国地図　― 国を選んで行動せよ ―</div>
+      <div id="province-grid"></div>
+    </div>
+
+    <!-- 右：評定＋武将＋ログ -->
+    <div id="right">
+
+      <!-- 評定 -->
+      <div class="fc">
+        <div class="ttl">評定</div>
+        <div class="phase-hint" id="phase-hint"></div>
+        <div id="actions"></div>
+      </div>
+
+      <!-- 戦闘結果 -->
+      <div id="battle-box" class="fc">
+        <div class="ttl">合戦記録</div>
+        <div id="battle-content"></div>
+        <button class="sm gold" onclick="closeBattle()" style="margin-top:6px">閉じる</button>
+      </div>
+
+      <!-- 武将 -->
+      <div class="fc">
+        <div class="ttl">配下武将</div>
+        <div id="officers" class="officers"></div>
+      </div>
+
+      <!-- ログ -->
+      <div class="fc">
+        <div class="ttl">軍記
+          <button class="sm purp" onclick="toggleCheat()" style="float:right">改造符</button>
+        </div>
+        <div id="cheat-box">
+          <div class="gttl" style="color:var(--purp)">■ 改造符</div>
+          <div class="row">
+            <button class="sm purp" onclick="cheat('money')">金FFFF</button>
+            <button class="sm purp" onclick="cheat('troops')">兵強化</button>
+            <button class="sm purp" onclick="cheat('warm')">寒冷解除</button>
+            <button class="sm purp" onclick="cheat('nanbu')">南部圧ゼロ</button>
+            <button class="sm purp" onclick="cheat('officers')">全武将</button>
+          </div>
+        </div>
+        <div id="log"></div>
+      </div>
+
+    </div>
+  </div><!-- #main -->
+</div><!-- #outer -->
+
+<!-- 国情ポップアップ -->
+<div id="info-popup">
+  <div id="info-box">
+    <div class="ib-head">
+      <span class="ib-name" id="ib-name">―</span>
+      <span class="ib-tag"  id="ib-tag">―</span>
+    </div>
+    <div class="ib-grid" id="ib-grid"></div>
+    <div class="ib-advice" id="ib-advice"></div>
+    <div class="ib-off" id="ib-off"></div>
+    <div class="ib-adj" id="ib-adj"></div>
+    <div style="text-align:right;margin-top:12px">
+      <button class="gold" onclick="closeInfo()">閉じる　[×]</button>
+    </div>
+  </div>
+</div>
+
+<!-- エンディング -->
+<div class="overlay" id="overlay">
+  <div class="obox">
+    <div class="otitle" id="otitle"></div>
+    <div class="omsg"   id="omsg"></div>
+    <button class="gold" onclick="closeOverlay()">もう一度</button>
+  </div>
+</div>
+
+<script>
+/* ============================================================
+   定数
+============================================================ */
+const PHASES = [
+  ['戦',   '出陣する。突撃・包囲・奇襲で戦い方を選べる。年3回まで。'],
+  ['経略', '田畑を開き、民を養う。寒冷が高いと効果が落ちる。'],
+  ['軍備', '徴兵・城普請・糧秣備蓄。冬に備えよ。'],
+  ['移動', '武将を動かす。吹雪の年は移動が困難になる。'],
+  ['政略', '縁組・寝返り・降伏勧告・忍者・朝廷工作。'],
+  ['年貢', '収穫・維持費・敵の動き・季節の事件。年を越す。'],
+];
+
+/* 奥羽10国
+   [名, 大名家, 当主, 石高, 城塞, 兵質, 隣接, 緯度(0南-3北), グリッド位置[col,row]]
+   col/row は 0-indexed */
+const PROVINCES = [
+  ['蝦夷',  '松前家',   '松前慶広',  20, 10, 2, ['津軽'],        3, [0,0]],
+  ['津軽',  '津軽家',   '津軽為信',  65, 16, 3, ['南部','出羽北'],2, [0,1]],
+  ['出羽北','安東家',   '安東愛季',  85, 22, 3, ['津軽','南部','出羽南'],2,[1,1]],
+  ['南部',  '南部家',   '南部晴政',130, 32, 5, ['津軽','陸奥','出羽北'],2,[2,1]],
+  ['出羽南','最上家',   '最上義光',  95, 24, 3, ['出羽北','陸奥','越後端'],1,[1,2]],
+  ['陸奥',  '伊達家',   '伊達輝宗',115, 26, 4, ['南部','陸前','会津'],1,[2,2]],
+  ['越後端','上杉家',   '上杉謙信',160, 35, 6, ['出羽南','会津'],0,[0,3]],
+  ['会津',  '蘆名家',   '蘆名盛氏',105, 30, 4, ['陸奥','陸前','越後端'],0,[1,3]],
+  ['陸前',  '葛西家',   '葛西晴信',  75, 18, 3, ['陸奥','常陸端','会津'],1,[2,3]],
+  ['常陸端','佐竹家',   '佐竹義重',100, 22, 3, ['陸前','会津'],0,[2,2]], // 陸奥と同列 → 実際は[3,3]
+];
+
+/* 武将マスタ */
+const OFFICERS = [
+  ['津軽為信','津軽家',6,5,5,6],['大浦盛信','津軽家',4,5,3,4],['北畠顕村','津軽家',3,4,5,3],
+  ['南部晴政','南部家',5,6,4,4],['九戸政実','南部家',6,7,3,5],['北信愛','南部家',5,4,5,4],
+  ['伊達輝宗','伊達家',5,5,5,5],['片倉景綱','伊達家',6,3,5,5],['伊達政宗','伊達家',7,6,5,7],
+  ['最上義光','最上家',5,4,6,4],['氏家守棟','最上家',3,5,4,3],
+  ['安東愛季','安東家',4,5,5,4],['蘆名盛氏','蘆名家',4,4,5,5],['佐竹義重','佐竹家',4,5,4,4],
+  ['大道寺直英','浪人',5,4,4,3],['板垣信安','浪人',3,6,2,4],
+];
+
+const RANKS = ['無位','検非違使','出羽守','陸奥守','近衛少将','参議','中納言','大納言','奥羽探題'];
+
+const RND_EVENTS = [
+  ['豊作',      '田畑が実った。',                        g=>P().forEach(c=>{c.rice+=40;c.morale=clamp(c.morale+5,0,100)}), 'evt'],
+  ['凶作',      '冷夏で米が実らなかった。',              g=>P().forEach(c=>{c.rice=Math.max(0,c.rice-35);c.morale=clamp(c.morale-8,0,100)}), 'famine'],
+  ['大吹雪',    '奥羽を大吹雪が襲った。',               g=>{game.blizzardNext=true;P().forEach(c=>c.soldiers=Math.max(4,Math.floor(c.soldiers*.88)))}, 'snow-log'],
+  ['蝦夷交易',  '松前を通じ南蛮交易。',                 g=>P().forEach(c=>c.gold+=35), 'evt'],
+  ['疫病流行',  '兵が弱った。',                          g=>P().forEach(c=>c.soldiers=Math.max(4,Math.floor(c.soldiers*.84))), 'warn'],
+  ['雪解け増水','春の雪解けで物資が流された。',          g=>P().forEach(c=>c.rice=Math.max(0,c.rice-20)), 'warn'],
+  ['在野武将',  '北の地を漂う強者が加わった。',          g=>{
+    const free=OFFICERS.filter(o=>!game.officers.find(x=>x.name===o[0]));
+    if(free.length){const r=free[rnd(free.length)];
+    game.officers.push({name:r[0],clan:r[1],str:r[2],war:r[3],pol:r[4],cha:r[5],
+      loyal:40+rnd(30),place:null,owned:true,alive:true,id:game.officers.length});}
+  }, 'dip'],
+  ['南部の密使','南部から脅しの密書。',                  g=>{game.nanbuPressure=Math.min(10,game.nanbuPressure+1);P().forEach(c=>c.morale=clamp(c.morale-6,0,100))}, 'warn'],
+  ['奥州の商人','南方から行商人が来た。',                g=>P().forEach(c=>c.gold+=22), 'evt'],
+  ['一揆勃発',  '飢えた民が一揆を起こした。',           g=>{const c=pick(P());if(c){c.soldiers=Math.max(4,c.soldiers-7);c.morale=clamp(c.morale-15,0,100);}}, 'loss'],
+];
+
+const HIST = [
+  {y:1575,owned:null,t:'長篠の時代',      m:'鉄砲の時代。補正発生。',         f:g=>game.tempBuff+=.3},
+  {y:1582,owned:null,t:'本能寺の変の余波',m:'奥州に緊張。敵が強化された。',   f:g=>E().forEach(c=>c.soldiers=Math.floor(c.soldiers*1.2))},
+  {y:null, owned:5,  t:'奥羽の雄',        m:'諸将から警戒される。',           f:g=>{game.nanbuPressure=Math.min(10,game.nanbuPressure+2);E().forEach(c=>c.soldiers+=8)}},
+  {y:1584,owned:null,t:'政宗元服',        m:'伊達政宗が台頭した。',           f:g=>{const p=game.officers.find(o=>o.name==='伊達政宗');if(p){p.war=7;p.str=7;p.cha=8;}}},
+];
+
+/* ============================================================
+   ゲーム状態
+============================================================ */
+let game, selected = null;
+const $  = id => document.getElementById(id);
+const rnd  = n  => Math.floor(Math.random()*n);
+const pick = a  => a[rnd(a.length)];
+const clamp= (v,a,b) => Math.max(a,Math.min(b,v));
+
+function newGame(){
+  const clan='津軽家';
+  const countries = PROVINCES.map((p,i)=>({
+    id:i, name:p[0], clan:p[1], lord:p[2],
+    koku:p[3], castle:p[4], quality:p[5], neighbors:p[6], latitude:p[7], grid:p[8],
+    owner: p[1]===clan?'player':'enemy',
+    rel:'enemy', vassal:false,
+    soldiers:Math.max(5,Math.round(p[3]/7)),
+    gold:20+Math.round(p[3]/6), rice:30+Math.round(p[3]/4),
+    guns:0, morale:50+rnd(20),
+    scouted: p[1]===clan || p[0]==='南部',
+  }));
+  const officers=OFFICERS.map((o,i)=>({
+    id:i, name:o[0], clan:o[1],
+    str:o[2], war:o[3], pol:o[4], cha:o[5],
+    loyal:45+rnd(35), place:null, owned:false, alive:true,
+  }));
+  countries.forEach(c=>{
+    const lord=officers.find(o=>o.name===c.lord)||officers.find(o=>o.clan===c.clan);
+    if(lord){lord.place=c.name; if(c.owner==='player')lord.owned=true;}
+  });
+  officers.filter(o=>o.clan===clan).forEach(o=>{o.owned=true; if(!o.place)o.place='津軽';});
+  game={
+    clan, year:1572, phase:0, rank:0,
+    acts:{war:3}, countries, officers,
+    log:[], seen:{},
+    coldLevel:4, blizzardNext:false,
+    nanbuPressure:2,
+    tempBuff:0, diploBonus:0,
+    season:'winter', ezoRefuge:false, _ended:false,
+  };
+  selected='津軽';
+  addLog('天正元年、津軽為信は南部に背き挙兵した。北の果てより天下を望む。','evt');
+  render();
+  updateSeasonBanner();
+}
+
+/* ── ユーティリティ ─────────────────── */
+const P    = ()=> game.countries.filter(c=>c.owner==='player');
+const E    = ()=> game.countries.filter(c=>c.owner==='enemy');
+const V    = ()=> game.countries.filter(c=>c.owner==='vassal');
+const C    = n => game.countries.find(c=>c.name===n);
+const own  = ()=> game.officers.filter(o=>o.owned&&o.alive);
+const at   = n => own().filter(o=>o.place===n);
+const enAt = n => game.officers.filter(o=>!o.owned&&o.alive&&o.place===n);
+const best = (n,stat,owned=true)=>{
+  const pool=owned?at(n):enAt(n);
+  return pool.sort((a,b)=>b[stat]-a[stat])[0]||{str:2,war:2,pol:2,cha:2,name:'総大将'};
+};
+function addLog(t,cls=''){
+  game.log.unshift({t:`【${game.year}年 ${PHASES[game.phase][0]}】${t}`,cls});
+  game.log=game.log.slice(0,120);
+}
+function targets(){
+  const s=new Set();
+  P().concat(V()).forEach(c=>c.neighbors.forEach(n=>{
+    const t=C(n); if(t&&t.owner==='enemy'&&t.rel!=='ally')s.add(n);
+  }));
+  return [...s];
+}
+function getSeason(year){
+  const m=(year-1572)%4;
+  return m===0?'winter':m===1?'spring':m===2?'summer':'autumn';
+}
+function updateSeasonBanner(){
+  if(!game)return;
+  const s=game.blizzardNext?'blizzard':game.season;
+  const lbl={winter:'冬',spring:'春',summer:'夏',autumn:'秋',blizzard:'大吹雪'}[s];
+  const phrase={
+    winter:'― 津軽は雪に閉ざされている ―',
+    spring:'― 雪解けの泥濘が行軍を阻む ―',
+    summer:'― 短い夏、刈り取る前に戦え ―',
+    autumn:'― 収穫の後、冬が忍び寄る ―',
+    blizzard:'― 白き死が奥羽を覆う ―',
+  }[s];
+  const sb=$('season-banner');
+  sb.className=s;
+  sb.textContent=`${game.year}年　${lbl}　${phrase}`;
+}
+
+/* ============================================================
+   描画
+============================================================ */
+function render(){
+  if(!game)return newGame();
+  updateSeasonBanner();
+
+  /* フェイズバー */
+  $('phasebar').innerHTML=PHASES.map((p,i)=>
+    `<div class="ph ${i===game.phase?'active':i<game.phase?'done':''}">
+      <span class="pn">${i+1}</span>${p[0]}
+    </div>`
+  ).join('');
+
+  /* ステータス */
+  const land=P().length, koku=P().reduce((s,c)=>s+c.koku,0);
+  const sol=P().reduce((s,c)=>s+c.soldiers,0), gold=P().reduce((s,c)=>s+c.gold,0);
+  const rice=P().reduce((s,c)=>s+c.rice,0);
+  $('statusbar').innerHTML=[
+    ['年',  game.year,''],
+    ['領国',`${land}/9`  ,land>=7?'hi':''],
+    ['石高',koku,''],
+    ['総兵',sol, sol<15?'danger':sol<25?'warn':''],
+    ['金庫',gold,gold<20?'warn':''],
+    ['米倉',rice,rice<30?'warn':''],
+    ['官位',RANKS[game.rank],game.rank>=4?'hi':''],
+    ['圧力',`南部${game.nanbuPressure}`,game.nanbuPressure>=7?'danger':game.nanbuPressure>=4?'warn':''],
+  ].map(([l,v,c])=>
+    `<div class="stat ${c}"><span class="lbl">${l}</span><span class="val">${v}</span></div>`
+  ).join('');
+
+  /* ゲージ */
+  $('cold-val').textContent=game.coldLevel;
+  const clbls=['穏','涼','冷','寒','酷寒','極寒','凍死域'];
+  $('cold-lbl').textContent=clbls[Math.min(6,Math.floor(game.coldLevel*.65))];
+  $('cold-bar').querySelector('i').style.width=Math.min(100,game.coldLevel*10)+'%';
+  $('cold-bar').querySelector('i').style.background=game.coldLevel>=8?'#88ccff':game.coldLevel>=5?'#5599cc':'#3a7799';
+  $('nanbu-val').textContent=game.nanbuPressure;
+  $('nanbu-bar').querySelector('i').style.width=Math.min(100,game.nanbuPressure*10)+'%';
+
+  /* 地図 */
+  renderMap();
+
+  renderActions();
+  renderOfficers();
+  $('log').innerHTML=game.log.map(l=>`<div class="l ${l.cls}">${l.t}</div>`).join('');
+  if(!game._ended)checkEnd();
+}
+
+/* ── 地図描画（FC風大ブロック） ─────── */
+function renderMap(){
+  const tg=targets();
+  const grid=$('province-grid');
+  grid.innerHTML='';
+
+  /* グリッド配置マップ
+     col: 0=西, 1=中, 2=東
+     row: 0=最北(蝦夷), 1=北部, 2=中部, 3=南部
+  */
+  const layout=[
+    // row0
+    [null,   null,   null  ],
+    // row1  西      中      東
+    ['蝦夷', null,   null  ],
+    // row2
+    ['津軽','出羽北','南部' ],
+    // row3
+    ['越後端','出羽南','陸奥'],
+    // row4
+    [null,  '会津', '陸前' ],
+    // row5
+    [null,  null,  '常陸端'],
+  ];
+
+  layout.forEach((row,ri)=>{
+    row.forEach((name,ci)=>{
+      const slot=document.createElement('div');
+      if(!name){
+        // 空セル
+        slot.style.cssText='';
+        grid.appendChild(slot);
+        return;
+      }
+      const c=C(name);
+      if(!c){grid.appendChild(slot);return;}
+
+      const own_=c.owner==='player'?'player':c.owner==='vassal'?'vassal':c.rel==='ally'?'ally':'enemy';
+      const isTgt=tg.includes(name);
+      const isSel=selected===name;
+      const seen=c.owner!=='enemy'||c.scouted;
+      const isBliz=game.blizzardNext&&c.latitude>=1;
+      const isFrozen=c.latitude>=2&&game.coldLevel>=7;
+      const isEzo=name==='蝦夷';
+
+      const tagText={player:'自領',vassal:'従属',ally:'同盟',enemy:'敵国'}[own_];
+      const tagCls ={player:'self',vassal:'vassal',ally:'ally',enemy:'enemy'}[own_];
+
+      let cls=`prov ${own_}`;
+      if(isTgt)cls+=' target';
+      if(isSel)cls+=' sel';
+      if(isFrozen)cls+=' frozen';
+      if(isBliz)cls+=' bliz';
+      if(isEzo)cls+=' ezo';
+
+      const solBar=seen?Math.min(100,c.soldiers*1.5):0;
+
+      slot.className=cls;
+      slot.onclick=()=>selectCountry(name);
+      slot.ondblclick=()=>openInfo(name);
+      slot.innerHTML=`
+        <span class="prov-tag ${tagCls}">${tagText}</span>
+        <div class="prov-name">${name}</div>
+        <div class="prov-lord">${c.lord}</div>
+        <div class="prov-sol">兵 <span>${seen?c.soldiers:'??'}</span></div>
+        <div class="prov-bar"><i style="width:${solBar}%"></i></div>
+      `;
+      grid.appendChild(slot);
+    });
+  });
+}
+
+/* ── 国情ポップアップ ────────────────── */
+function openInfo(name){
+  const c=C(name||selected);
+  if(!c)return;
+  const seen=c.owner!=='enemy'||c.scouted;
+  const own_=c.owner==='player'?'player':c.owner==='vassal'?'vassal':c.rel==='ally'?'ally':'enemy';
+  const tagLabel={player:'自領',vassal:'従属',ally:'同盟',enemy:'敵国'}[own_];
+  const tagColor={player:'var(--blue)',vassal:'var(--green)',ally:'#6a9ab8',enemy:'var(--red)'}[own_];
+  const tg=targets();
+  const os=game.officers.filter(o=>o.alive&&o.place===c.name);
+  const power=seen?Math.round(c.soldiers*(1+c.quality/10)+c.castle*1.5+c.morale/4):'??';
+
+  $('ib-name').textContent=`${c.name}　${c.lord}`;
+  $('ib-tag').textContent=tagLabel;
+  $('ib-tag').style.color=tagColor;
+  $('ib-tag').style.borderColor=tagColor;
+
+  $('ib-grid').innerHTML=[
+    ['石高',c.koku],['城塞',c.castle],
+    ['兵',seen?c.soldiers:'??'],['士気',seen?c.morale:'??'],
+    ['兵質',c.quality],['鉄砲',seen?c.guns:'??'],
+    ['戦力',power],['武将',seen?os.length:'??'],
+  ].map(([l,v])=>
+    `<div class="ib-cell"><span class="dl">${l}</span><span class="dv">${v}</span></div>`
+  ).join('');
+
+  let advice='';
+  if(c.name==='南部'&&c.owner==='enemy') advice='⚠ 宿敵・南部晴政。城が固く兵質も高い。包囲で士気を削れ。';
+  else if(c.name==='越後端'&&c.owner==='enemy') advice='⚠ 上杉謙信の勢力圏。正面からは不利。同盟か時を待て。';
+  else if(c.name==='蝦夷') advice='蝦夷は退路。追い詰められたとき渡海できる。松前との交易も有効。';
+  else if(tg.includes(c.name)) advice='▶ 攻撃可能。戦フェイズで出陣できます。';
+  else if(c.owner==='player'&&c.morale<35) advice='⚠ 士気が低い。厳冬が続くと離反の恐れがある。施米を。';
+  else if(c.latitude>=2&&game.coldLevel>=7) advice='❄ 凍結警報。徴兵と移動に大きなペナルティ。';
+  else if(c.owner==='vassal') advice='従属国。援軍に来るが、南部に調略される恐れがある。';
+  else advice=`寒冷影響：${c.latitude>=2?'大':c.latitude===1?'中':'小'}`;
+  $('ib-advice').textContent=advice;
+
+  const officerStr=seen
+    ?os.map(o=>`${o.name}（${o.owned?'配下':'敵将'}）`).join('　')||'なし'
+    :'未偵察';
+  $('ib-off').innerHTML='武将: '+officerStr;
+
+  const adj=c.neighbors.map(n=>{
+    const x=C(n);if(!x)return'';
+    const s=x.owner==='player'?'自':x.owner==='vassal'?'従':x.rel==='ally'?'盟':'敵';
+    return `${n}(${s})`;
+  }).filter(Boolean).join('　');
+  $('ib-adj').textContent='隣接: '+(adj||'なし');
+
+  $('info-popup').classList.add('show');
+}
+function closeInfo(){ $('info-popup').classList.remove('show'); }
+// クリック外で閉じる
+$('info-popup').addEventListener('click', e=>{ if(e.target===$('info-popup'))closeInfo(); });
+
+function renderOfficers(){
+  const list=own().sort((a,b)=>(a.place||'').localeCompare(b.place||'')||b.str-a.str);
+  $('officers').innerHTML=list.map(o=>`
+    <div class="off">
+      <div>
+        <span class="off-name">${o.name}</span>
+        <span class="off-where">　${o.place||'未配置'}</span><br>
+        <span class="off-stats">
+          作${o.str} 戦${o.war} 政${o.pol} 魅${o.cha}
+          　忠<span class="${o.loyal<35?'lo':o.loyal>75?'hi':''}">${o.loyal}</span>
+        </span>
+      </div>
+      <button class="sm" onclick="focusOfficer(${o.id})">▶</button>
+    </div>
+  `).join('')||'<span class="small">配下武将なし。</span>';
+}
+
+function renderActions(){
+  const c=C(selected)||P()[0];
+  const po=c&&c.owner==='player';
+  const ph=game.phase;
+  let h='';
+
+  /* フェイズヒント */
+  h+=`<div class="phase-hint" id="phase-hint">${PHASES[ph][1]}</div>`;
+
+  if(ph===0){
+    const tg=targets().filter(n=>n!=='蝦夷');
+    const warLeft=game.acts.war;
+    h+=`<div class="group">
+      <div class="gttl">出陣回数 <b style="color:${warLeft>1?'var(--green)':warLeft===1?'var(--gold)':'var(--red)'}">${warLeft}</b>/3
+        ${game.blizzardNext?'　<span style="color:var(--bliz)">❄吹雪: 攻-20%</span>':''}
+      </div>`;
+    if(tg.length){
+      tg.forEach(n=>{
+        const t=C(n);
+        const est=Math.round(t.soldiers*(1+t.quality/10)+t.castle*1.5+t.morale/4);
+        const isN=n==='南部';
+        h+=`<div style="margin-bottom:6px">
+          <span style="color:${isN?'var(--red)':'var(--warn)'};font-weight:bold">${n}${isN?'【宿敵】':''}</span>
+          <span class="small"> 推定${t.scouted?est:'??'}</span><br>
+          <button class="sm red"  onclick="attack('${n}','突撃')">突撃</button>
+          <button class="sm"      onclick="attack('${n}','包囲')">包囲</button>
+          <button class="sm blue" onclick="attack('${n}','奇襲')">奇襲</button>
+        </div>`;
+      });
+    } else {
+      h+='<span class="small">攻め込める隣国がありません。</span>';
+    }
+    h+='</div>';
+
+  }else if(ph===1){
+    const cp=game.coldLevel>=6;
+    h+=`<div class="group"><div class="gttl">経略対象: <b>${selected||'―'}</b>${cp?'　<span style="color:var(--cold)">❄効果-</span>':''}</div>
+      ${po?`<button onclick="develop(15)">経略 15金</button>
+            <button onclick="develop(40)">大経略 40金</button>
+            <button onclick="relief()">施米（士気↑）</button>`
+          :'<span class="small">自国を選んでください。</span>'}
+    </div>`;
+
+  }else if(ph===2){
+    h+=`<div class="group"><div class="gttl">軍備対象: <b>${selected||'―'}</b></div>
+      ${po?`<button onclick="recruit()">徴兵</button>
+            <button onclick="fortify()">城普請</button>
+            <button onclick="stockRice()">糧秣備蓄</button>
+            <button onclick="stipend()">俸禄加増</button>`
+          :'<span class="small">自国を選んでください。</span>'}
+    </div>`;
+
+  }else if(ph===3){
+    h+=`<div class="group"><div class="gttl">武将移動${game.blizzardNext?'　<span style="color:var(--bliz)">❄北部困難</span>':''}</div><div class="row">`;
+    own().forEach(o=>{
+      h+=`<button class="sm" onclick="moveOfficer(${o.id})">${o.name}（${o.place||'?'}）</button>`;
+    });
+    h+=`</div><div class="small" style="margin-top:4px">押した武将を選択中の国へ移します。</div></div>`;
+    if(P().length<=2&&C('蝦夷')&&C('蝦夷').owner!=='player'){
+      h+=`<div class="group" style="border-color:#70b8a0">
+        <div class="gttl" style="color:#70b8a0">── 蝦夷渡海（退路） ──</div>
+        <button class="ezo-btn" onclick="ezoRefuge()">蝦夷へ渡る（再起）</button>
+      </div>`;
+    }
+
+  }else if(ph===4){
+    const dtg=new Set();
+    P().concat(V()).forEach(c=>c.neighbors.forEach(n=>{const t=C(n);if(t&&t.owner==='enemy')dtg.add(n);}));
+    const dtgArr=[...dtg].filter(n=>n!=='蝦夷');
+    h+=`<div class="group"><div class="gttl">官位: <b>${RANKS[game.rank]}</b></div>
+      <button class="gold" onclick="court()">朝廷工作</button>
+    </div>`;
+    if(dtgArr.length){
+      h+=`<div class="group"><div class="gttl">外交・調略</div><div class="row">
+        <select id="dip-sel">${dtgArr.map(n=>`<option>${n}</option>`).join('')}</select>
+        <button onclick="ally()">縁組</button>
+        <button onclick="turncoat()">寝返り</button>
+        <button onclick="submit()">降伏勧告</button>
+        <button onclick="ninja()">忍者</button>
+      </div></div>`;
+    }
+    const anto=C('出羽北');
+    if(anto&&anto.owner==='enemy'){
+      h+=`<div class="group" style="border-color:#3a6a8a">
+        <div class="gttl" style="color:#5a9ab8">安東家との海路交渉</div>
+        <button class="snow" onclick="antoAlliance()">十三湊の密約</button>
+      </div>`;
+    }
+
+  }else{
+    h+=`<div class="group">
+      <div class="gttl">年を越す</div>
+      <button class="gold" onclick="yearEnd()">▶ 年貢・年越し</button>
+    </div>`;
+  }
+
+  h+=`<div class="group" style="margin-top:2px">
+    <div class="gttl">共通コマンド</div>
+    <div class="row">
+      <button class="sm" onclick="doScout()">調べる</button>
+      <button class="sm blue" onclick="nextPhase()">次フェイズ ▶</button>
+      <button class="sm" onclick="saveGame()">保存</button>
+      <button class="sm" onclick="loadGame()">読込</button>
+    </div>
+    <div class="small" style="margin-top:3px">「調べる」= 選択中の国の詳細を表示　／　ダブルクリックでも同様</div>
+  </div>`;
+
+  $('actions').innerHTML=h;
+}
+
+/* ============================================================
+   選択・調べる
+============================================================ */
+function selectCountry(n){ selected=n; render(); }
+function focusOfficer(id){
+  const o=game.officers.find(x=>x.id===id);
+  if(o&&o.place){selected=o.place;render();}
+}
+function doScout(){
+  const c=C(selected);
+  if(!c){addLog('調べる国を選んでください。','warn');render();return;}
+  c.scouted=true;
+  addLog(c.name+'偵察: 兵'+c.soldiers+' 城'+c.castle+' 士気'+c.morale,'evt');
+  openInfo(c.name);
+  render();
+}
+
+/* ============================================================
+   資源
+============================================================ */
+function pay(cost){
+  let need=cost;
+  for(const c of P()){const p=Math.min(c.gold,need);c.gold-=p;need-=p;if(!need)break;}
+  return need===0;
+}
+function spendRice(cost){
+  let need=cost;
+  for(const c of P()){const p=Math.min(c.rice,need);c.rice-=p;need-=p;if(!need)break;}
+  return need===0;
+}
+
+/* ============================================================
+   戦フェイズ
+============================================================ */
+function attack(n,tactic){
+  if(game.acts.war<=0){addLog('今年の戦はもうできぬ。','warn');render();return;}
+  const d=C(n);
+  const from=P().filter(c=>c.neighbors.includes(n)).sort((a,b)=>b.soldiers-a.soldiers)[0];
+  if(!from||!d)return;
+  const aGen=best(from.name,'str',true);
+  const dGen=best(d.name,'str',false);
+  let aMen=from.soldiers;
+  const aid=V().filter(c=>c.neighbors.includes(n)&&Math.random()<.5).reduce((s,c)=>s+Math.max(1,Math.floor(c.soldiers*.3)),0);
+  if(aid){aMen+=aid;addLog('従属国より援軍 '+aid+'。','dip');}
+  game.acts.war--;
+  const blizMod=game.blizzardNext?.80:1.0;
+  const nanbuB=n==='南部'?1.25:1.0;
+  const field=d.soldiers>0&&(d.castle<5||d.soldiers>=aMen*.75);
+  let text='',won=false;
+  if(field){
+    let am=80+from.morale*.35,dm=80+d.morale*.35;
+    let ap=aMen*(.7+Math.random()*.6)*(1+from.quality/10)*(1+aGen.war/12)*blizMod;
+    let dp=d.soldiers*(.7+Math.random()*.6)*(1+d.quality/10)*(1+dGen.war/12)*nanbuB;
+    if(tactic==='包囲'){dm-=18+aGen.str*3;ap*=.92;}
+    if(tactic==='奇襲'){
+      if(Math.random()<.18+aGen.str*.07){dp*=.48;dm-=35;text+='奇襲成功！';}
+      else{am-=38;ap*=.7;text+='奇襲失敗…';}
+    }
+    if(tactic==='突撃')ap*=1.08;
+    if(from.guns>=4&&Math.random()>.25){dp-=from.guns*3;text+='鉄砲斉射。';}
+    if(game.tempBuff>0){ap*=(1+game.tempBuff);game.tempBuff=0;}
+    if(game.blizzardNext)text+='吹雪で視界が悪い。';
+    am-=Math.max(5,dp/aMen*22);dm-=Math.max(5,ap/d.soldiers*22);
+    won=(ap>dp||dm<=0)&&am>0;
+    from.soldiers=Math.max(0,Math.round(from.soldiers*(won?.87:.72)));
+    d.soldiers   =Math.max(0,Math.round(d.soldiers*(won?.60:.84)));
+    from.morale=clamp(Math.round(am),5,100);
+    d.morale   =clamp(Math.round(dm),0,100);
+    showBattle(from,d,won,`野戦 攻${Math.round(ap)} vs 守${Math.round(dp)}。${text}`);
+  }else{
+    const siege=aMen*(1+aGen.str/10)+aGen.pol*8+Math.random()*40;
+    const wall=d.castle*(tactic==='包囲'?10:13)*nanbuB+dGen.pol*8;
+    d.castle=Math.max(0,d.castle-Math.max(2,Math.round(siege/18)));
+    from.soldiers=Math.max(0,from.soldiers-rnd(4));
+    won=d.castle<=0||siege>wall*1.4;
+    showBattle(from,d,won,`籠城戦。城塞${d.castle}まで削る。${text}`);
+  }
+  if(won){
+    capture(d,from);
+    addLog(from.name+'より'+d.name+'を攻略。'+text,'win');
+    if(n==='南部'){game.nanbuPressure=Math.max(0,game.nanbuPressure-4);addLog('南部晴政の圧力が大きく削がれた！','win');}
+  }else{
+    addLog(d.name+'攻めは崩れた。'+text,'loss');
+  }
+  nextPhase(false);render();
+}
+function capture(d,from){
+  const captives=enAt(d.name);
+  d.owner='player';d.rel='enemy';d.vassal=false;
+  d.lord=game.clan;d.castle=Math.max(8,d.castle);d.morale=45;
+  captives.forEach(o=>{
+    const rate=.25+best(from.name,'cha').cha*.04+game.rank*.02-(o.loyal||50)/220;
+    if(Math.random()<rate){o.owned=true;o.loyal=30+rnd(35);addLog(o.name+'を召し抱えた。','dip');}
+    else if(Math.random()<.2){o.alive=false;addLog(o.name+'は討死。','loss');}
+    else{o.place=null;addLog(o.name+'は落ち延びた。','warn');}
+  });
+}
+function showBattle(a,d,won,text){
+  $('battle-box').classList.add('show');
+  $('battle-content').innerHTML=`
+    <div class="bt-title ${won?'bt-win':'bt-loss'}">${won?'勝鬨':'敗軍'}</div>
+    <div class="bt-cols">
+      <div class="bt-side"><b>${a.name}</b>
+        <div class="bbar atk"><i style="width:${Math.min(100,a.soldiers)}%"></i></div>
+        <div class="bbar mo"><i style="width:${a.morale}%"></i></div>
+        <span class="small">兵${a.soldiers} 城${a.castle} 士${a.morale}</span>
+      </div>
+      <div class="bt-side"><b>${d.name}（${d.lord}）</b>
+        <div class="bbar def"><i style="width:${Math.min(100,d.soldiers)}%"></i></div>
+        <div class="bbar mo"><i style="width:${d.morale}%"></i></div>
+        <span class="small">兵${d.soldiers} 城${d.castle} 士${d.morale}</span>
+      </div>
+    </div>
+    <div class="bt-desc">${text}</div>`;
+}
+function closeBattle(){$('battle-box').classList.remove('show');}
+
+/* ============================================================
+   経略
+============================================================ */
+function develop(cost){
+  const c=C(selected);if(!c||c.owner!=='player'){addLog('自国を選んでください。','warn');render();return;}
+  if(!pay(cost)){addLog('金が足りない。','warn');render();return;}
+  const cp=Math.max(0,game.coldLevel-4)*.08;
+  const gain=Math.round((Math.min(cost,15)+Math.floor(Math.sqrt(Math.max(0,cost-15))*4)+best(selected,'pol').pol)*(1-cp));
+  c.koku=Math.min(c.koku+gain,c.koku+38);c.morale=clamp(c.morale+3,0,100);
+  addLog(c.name+'を経略。石高+'+gain+(cp>0?`（寒冷-${Math.round(cp*100)}%）`:''),'evt');
+  nextPhase();
+}
+function relief(){
+  const c=C(selected);if(!c||c.owner!=='player'){addLog('自国を選んでください。','warn');render();return;}
+  if(!spendRice(22)){addLog('米が足りない。','warn');render();return;}
+  c.morale=clamp(c.morale+20,0,100);addLog(c.name+'に施米。','evt');nextPhase();
+}
+
+/* ============================================================
+   軍備
+============================================================ */
+function recruit(){
+  const c=C(selected);if(!c||c.owner!=='player'){addLog('自国を選んでください。','warn');render();return;}
+  if(!pay(20)){addLog('金が足りない。','warn');render();return;}
+  const lp=c.latitude>=2&&game.coldLevel>=6?.6:1.0;
+  c.soldiers+=Math.round((4+Math.floor(c.koku/40))*lp);
+  c.morale=clamp(c.morale-4,0,100);
+  addLog(c.name+'で徴兵。'+(lp<1?'厳寒で集まりが悪い。':''),'evt');nextPhase();
+}
+function fortify(){
+  const c=C(selected);if(!c||c.owner!=='player'){addLog('自国を選んでください。','warn');render();return;}
+  const cost=Math.max(8,22-best(selected,'pol').pol*2);
+  if(!pay(cost)){addLog('金が足りない（'+cost+'必要）。','warn');render();return;}
+  c.castle=clamp(c.castle+1+rnd(3),0,70);addLog(c.name+'の城塞を強めた。','evt');nextPhase();
+}
+function stockRice(){
+  const c=C(selected);if(!c||c.owner!=='player'){addLog('自国を選んでください。','warn');render();return;}
+  if(!pay(18)){addLog('金が足りない。','warn');render();return;}
+  c.rice+=35;game.coldLevel=Math.max(0,game.coldLevel-.5);
+  addLog(c.name+'に糧秣備蓄。冬への備えが整った。','evt');nextPhase();
+}
+function stipend(){
+  if(!pay(16)){addLog('金が足りない。','warn');render();return;}
+  own().forEach(o=>o.loyal=clamp(o.loyal+6,0,100));
+  addLog('俸禄を加増。','dip');nextPhase();
+}
+
+/* ============================================================
+   移動
+============================================================ */
+function moveOfficer(id){
+  const o=game.officers.find(x=>x.id===id);
+  const dest=C(selected);
+  if(!o||!dest||(dest.owner!=='player'&&dest.owner!=='vassal')){addLog('移動できない場所です。','warn');render();return;}
+  if(game.blizzardNext&&dest.latitude>=2&&Math.random()<.45){addLog(o.name+'は吹雪で立ち往生した。','snow-log');render();return;}
+  if(!o.place||o.place===dest.name||C(o.place)?.neighbors.includes(dest.name)||dest.owner==='vassal'){
+    o.place=dest.name;addLog(o.name+'を'+dest.name+'へ移した。','evt');nextPhase();
+  }else{addLog(o.name+'は隣国にしか移動できない。','warn');render();}
+}
+function ezoRefuge(){
+  const ezo=C('蝦夷');if(!ezo)return;
+  ezo.owner='player';ezo.morale=60;ezo.soldiers=Math.max(8,ezo.soldiers);
+  game.ezoRefuge=true;
+  const ts=own().find(o=>o.name==='津軽為信');if(ts)ts.place='蝦夷';
+  addLog('為信、蝦夷へ渡海した。松前慶広の庇護を得て再起を誓う。','snow-log');
+  playJingle('ezo');render();
+}
+
+/* ============================================================
+   政略
+============================================================ */
+function getDipTarget(){return document.getElementById('dip-sel')?.value;}
+function ally(){
+  const n=getDipTarget();const c=C(n);if(!c){addLog('相手がいない。','warn');render();return;}
+  const diploMod=n==='南部'?.3:1.0;
+  if(pay(28)&&(best(P()[0].name,'cha').cha+game.rank+rnd(8))*diploMod>6){
+    c.rel='ally';addLog(c.name+'と縁組成立。','dip');
+  }else{addLog(c.name+'との縁組はまとまらず。','loss');}
+  nextPhase();
+}
+function turncoat(){
+  const n=getDipTarget();const pool=enAt(n||'');
+  if(!pool.length){addLog('狙える武将がいない。','warn');render();return;}
+  if(!pay(5)){addLog('金が足りない。','warn');render();return;}
+  const o=pool.sort((a,b)=>a.loyal-b.loyal)[0];
+  const np=n==='南部'?.6:1.0;
+  const chance=(.15+game.rank*.03+(best(P()[0].name,'cha').cha-o.loyal/20)*.05)*np;
+  if(Math.random()<chance){o.owned=true;o.loyal=25+rnd(35);addLog(o.name+'が寝返った！','dip');}
+  else{addLog(o.name+'は動かず。','warn');}
+  nextPhase();
+}
+function submit(){
+  const n=getDipTarget();const c=C(n);if(!c){addLog('相手がいない。','warn');render();return;}
+  if(n==='南部'){addLog('南部晴政は降伏を拒む。','warn');nextPhase();return;}
+  const pressure=P().length+V().length+game.rank*2+(c.soldiers<10?5:0)+(c.castle<10?2:0);
+  if(game.year>=1577&&pressure>9+rnd(8)){c.owner='vassal';c.vassal=true;c.morale=45;addLog(c.lord+'、従属。','dip');}
+  else{addLog(c.name+'は降伏を拒んだ。','loss');}
+  nextPhase();
+}
+function ninja(){
+  const n=getDipTarget();const c=C(n);if(!c){addLog('相手がいない。','warn');render();return;}
+  if(!pay(70)){addLog('金が足りない（70必要）。','warn');render();return;}
+  const r=rnd(5);
+  if(r===0){c.soldiers=Math.max(0,c.soldiers-10-rnd(12));addLog('忍者成功。兵が減った。','dip');}
+  else if(r===1){c.castle=Math.max(1,c.castle-4-rnd(3));addLog('火付け成功。城塞低下。','dip');}
+  else if(r===2){c.morale=Math.max(0,c.morale-20);addLog('流言成功。士気が乱れた。','dip');}
+  else{P().forEach(x=>x.morale=clamp(x.morale-4,0,100));addLog('忍者失敗。評判が落ちた。','loss');}
+  nextPhase();
+}
+function court(){
+  const cost=50+game.rank*20;
+  if(!pay(cost)){addLog('金が足りない（'+cost+'必要）。','warn');render();return;}
+  const score=P().length+Math.floor(P().reduce((s,c)=>s+c.koku,0)/350)+best(P()[0].name,'cha').cha+rnd(8);
+  if(score>10+game.rank*2){game.rank=Math.min(RANKS.length-1,game.rank+1);addLog('京より'+RANKS[game.rank]+'に叙任。','dip');}
+  else{addLog('朝廷工作は空振りに終わった。','warn');}
+  nextPhase();
+}
+function antoAlliance(){
+  if(!pay(20)){addLog('金が足りない。','warn');render();return;}
+  const anto=C('出羽北');if(!anto)return;
+  const score=rnd(10)+best(P()[0].name,'cha').cha+(P().some(c=>c.name==='津軽')?3:0);
+  if(score>8){anto.rel='ally';addLog('安東愛季と十三湊の密約成立。','dip');}
+  else{addLog('安東家は様子見を崩さなかった。','warn');}
+  nextPhase();
+}
+
+/* ============================================================
+   フェイズ進行
+============================================================ */
+function nextPhase(doRender=true){
+  game.phase++;
+  if(game.phase>=PHASES.length)game.phase=0;
+  if(doRender)render();
+}
+
+/* ============================================================
+   年末処理
+============================================================ */
+function yearEnd(){
+  game.season=getSeason(game.year+1);
+  const chp=Math.max(0,game.coldLevel-3)*.07;
+  P().forEach(c=>{
+    const hm=1-chp-(c.latitude>=2?.06:0);
+    c.rice+=Math.round((15+Math.floor(c.koku/14))*hm);
+    c.gold+=7+Math.floor(c.koku/20);
+    c.morale=clamp(c.morale+2,0,100);
+  });
+  if(chp>.1)addLog('冷害で収穫が減った。','famine');
+  const upkeep=Math.max(0,P().reduce((s,c)=>s+c.soldiers,0)-P().length*7);
+  if(upkeep>0){
+    let need=Math.floor(upkeep/4);
+    P().forEach(c=>{const p=Math.min(c.rice,need);c.rice-=p;need-=p;});
+    if(need>0){P().forEach(c=>c.morale=clamp(c.morale-10,0,100));addLog('糧秣不足。士気が下がった。','warn');}
+  }
+  if(game.blizzardNext){
+    P().forEach(c=>{if(c.latitude>=2){c.soldiers=Math.max(4,Math.floor(c.soldiers*.82));c.morale=clamp(c.morale-12,0,100);}});
+    addLog('❄ 大吹雪が奥羽を覆った。北部の兵が凍えた。','snow-log');
+    game.blizzardNext=false;spawnSnow(true);
+  }else{spawnSnow(false);}
+  const s=game.season;
+  if(s==='winter')game.coldLevel=clamp(game.coldLevel+1+rnd(2),0,10);
+  else if(s==='spring')game.coldLevel=clamp(game.coldLevel-2,0,10);
+  else if(s==='summer')game.coldLevel=clamp(game.coldLevel-3,0,10);
+  else game.coldLevel=clamp(game.coldLevel+rnd(2),0,10);
+  const nb=C('南部');
+  if(nb&&nb.owner==='enemy'){
+    game.nanbuPressure=Math.min(10,game.nanbuPressure+(P().length>=4?1:0));
+    if(game.nanbuPressure>=7&&Math.random()<.7){
+      const ts=C('津軽');
+      if(ts&&ts.owner==='player'){
+        const pow=nb.soldiers*1.3,def=ts.soldiers+ts.castle*2;
+        if(pow>def){ts.owner='enemy';ts.lord='南部晴政';ts.soldiers=Math.max(5,Math.floor(ts.soldiers*.55));own().filter(o=>o.place==='津軽').forEach(o=>o.place=null);addLog('南部晴政の大軍が津軽を奪い返した！','loss');}
+        else{addLog('南部晴政の軍が攻め込んだが津軽の守りが固かった。','win');}
+      }
+    }
+  }
+  game.acts.war=3;
+  addLog('年貢を収めた。','evt');
+  enemyAI();events();game.year++;
+  playJingle('year');nextPhase();
+}
+
+/* ============================================================
+   敵AI
+============================================================ */
+function enemyAI(){
+  const nb=C('南部');
+  if(nb&&nb.owner==='enemy'){nb.gold+=12;nb.rice+=15;nb.morale=clamp(nb.morale+4,0,100);if(nb.gold>40){nb.gold-=25;nb.soldiers+=5;}}
+  const aggro=.16+game.nanbuPressure*.05;
+  E().filter(c=>c.name!=='南部').forEach(c=>{
+    c.gold+=7;c.rice+=8;c.morale=clamp(c.morale+2,0,100);
+    if(c.gold>30&&Math.random()<.4){c.gold-=20;c.soldiers+=3;}
+    const tgts=c.neighbors.map(C).filter(x=>x&&x.owner==='player');
+    if(tgts.length&&Math.random()<aggro&&c.soldiers>6){
+      const t=pick(tgts);
+      const pow=c.soldiers*(.8+Math.random()*.6)*(1+c.quality/10);
+      const def=t.soldiers*(.8+Math.random()*.6)*(1+t.quality/10)+t.castle*2;
+      if(pow>def){t.owner='enemy';t.lord=c.lord;t.soldiers=Math.max(4,Math.round(t.soldiers*.55));own().filter(o=>o.place===t.name).forEach(o=>o.place=null);addLog(c.lord+'の軍勢が'+t.name+'を奪った！','loss');}
+      else{addLog(c.lord+'の攻撃を'+t.name+'で防いだ。','win');}
+    }
+  });
+  game.countries.forEach(c=>{if(c.rel==='ally'&&Math.random()<.05){c.rel='enemy';addLog(c.name+'との同盟が揺らいだ。','warn');}});
+  V().forEach(c=>{if(Math.random()<.04+game.nanbuPressure*.015){c.owner='enemy';c.vassal=false;c.rel='enemy';addLog(c.lord+'が謀反を起こした！','warn');}});
+  if(Math.random()<.14+game.nanbuPressure*.04){
+    const low=own().filter(o=>o.loyal<45&&o.place);
+    if(low.length){const o=pick(low);if(Math.random()<.25+(45-o.loyal)/100){o.owned=false;addLog('南部の調略により'+o.name+'が出奔した。','loss');}}
+  }
+}
+
+/* ============================================================
+   イベント
+============================================================ */
+function events(){
+  HIST.forEach(h=>{
+    const yOk=h.y!==null&&h.y===game.year,oOk=h.owned!==null&&P().length>=h.owned;
+    if((yOk||oOk)&&!game.seen[h.t]){game.seen[h.t]=1;h.f(game);addLog('【史実】'+h.t+'：'+h.m,'evt');}
+  });
+  if(Math.random()<.32){const ev=pick(RND_EVENTS);ev[2](game);addLog('【事件】'+ev[0]+'：'+ev[1],ev[3]);}
+  own().forEach(o=>{const d=o.loyal>70?1:o.loyal<35?-3:-1;o.loyal=clamp(o.loyal+d+rnd(3)-1,0,100);});
+}
+
+/* ============================================================
+   勝敗
+============================================================ */
+function checkEnd(){
+  if(game._ended)return;
+  const nonEzo=game.countries.filter(c=>c.name!=='蝦夷');
+  if(nonEzo.filter(c=>c.owner==='enemy').length===0){
+    game._ended=true;$('otitle').textContent='奥羽統一';
+    $('omsg').innerHTML=`${game.year}年、津軽為信は奥羽十国を統べた。<br>北の地より天下を望む雄となった。`;
+    $('overlay').classList.add('show');playJingle('win');
+  }else if(P().filter(c=>c.name!=='蝦夷').length===0&&!game.ezoRefuge){
+    game._ended=true;$('otitle').textContent='滅亡';
+    $('omsg').innerHTML=`津軽為信の夢は、雪の中に消えた。<br>南部晴政が哄笑する。`;
+    $('overlay').classList.add('show');
+  }else if(P().length===1&&P()[0].name==='蝦夷'){
+    game._ended=true;$('otitle').textContent='蝦夷に生きる';
+    $('omsg').innerHTML=`為信は蝦夷に隠棲し、<br>奥羽の覇を諦めた。`;
+    $('overlay').classList.add('show');
+  }else if(game.year>1615){
+    game._ended=true;$('otitle').textContent='時代の果て';
+    $('omsg').innerHTML=`天下分け目の時代が過ぎた。<br>津軽は生き延びたが、天下は届かなかった。`;
+    $('overlay').classList.add('show');
+  }
+}
+function closeOverlay(){$('overlay').classList.remove('show');newGame();}
+
+/* ============================================================
+   セーブ・ロード
+============================================================ */
+function saveGame(){
+  try{localStorage.setItem('tsugaru_v3',JSON.stringify({game,selected}));addLog('保存した。','evt');render();}
+  catch(e){addLog('保存失敗。','warn');render();}
+}
+function loadGame(){
+  try{
+    const d=localStorage.getItem('tsugaru_v3');
+    if(d){const obj=JSON.parse(d);game=obj.game;selected=obj.selected;addLog('読み込んだ。','evt');render();}
+    else{addLog('保存データなし。','warn');render();}
+  }catch(e){addLog('読込失敗。','warn');render();}
+}
+
+/* ============================================================
+   チート
+============================================================ */
+function toggleCheat(){$('cheat-box').classList.toggle('open');}
+function cheat(k){
+  if(k==='money')   P().forEach(c=>c.gold=9999);
+  if(k==='troops')  P().forEach(c=>{c.soldiers+=40;c.quality=6;c.morale=100;});
+  if(k==='warm')    {game.coldLevel=0;game.blizzardNext=false;}
+  if(k==='nanbu')   {game.nanbuPressure=0;}
+  if(k==='officers')OFFICERS.forEach(o=>{
+    if(!game.officers.find(x=>x.name===o[0]))
+      game.officers.push({id:game.officers.length,name:o[0],clan:o[1],str:o[2],war:o[3],pol:o[4],cha:o[5],loyal:60,place:P()[0]?.name,owned:true,alive:true});
+    else game.officers.find(x=>x.name===o[0]).owned=true;
+  });
+  addLog('[改造符] '+k,'warn');render();
+}
+
+/* ============================================================
+   雪エフェクト
+============================================================ */
+function spawnSnow(heavy=false){
+  const layer=$('snow-layer');if(!layer)return;
+  layer.innerHTML='';
+  const count=heavy?30:8;
+  for(let i=0;i<count;i++){
+    const f=document.createElement('div');
+    f.className='snowflake';
+    f.textContent=heavy?'❄':'·';
+    f.style.left=rnd(100)+'%';
+    f.style.top='-20px';
+    f.style.animationDuration=(4+Math.random()*6)+'s';
+    f.style.animationDelay=(Math.random()*4)+'s';
+    f.style.fontSize=(8+rnd(heavy?10:4))+'px';
+    layer.appendChild(f);
+  }
+  setTimeout(()=>{if(layer)layer.innerHTML='';},10000);
+}
+
+/* ============================================================
+   音源エンジン
+============================================================ */
+let audio={ctx:null,master:null,muted:true,started:false,timer:null,step:0};
+const NOTE={C3:130.81,D3:146.83,E3:164.81,F3:174.61,G3:196,A3:220,B3:246.94,
+            C4:261.63,D4:293.66,E4:329.63,F4:349.23,G4:392,A4:440,B4:493.88,
+            C5:523.25,D5:587.33,E5:659.25,G5:783.99,R:0};
+const BGM={
+  0:[['A3','C4','E4','D4','C4','A3','G3','A3'],['A3','E3','A3','E3']],
+  1:[['C4','E4','G4','E4','D4','C4','D4','E4'],['C3','G3','C3','G3']],
+  2:[['G3','A3','C4','D4','E4','D4','C4','A3'],['G3','G3','C3','G3']],
+  3:[['E4','D4','C4','D4','E4','G4','E4','D4'],['C3','G3','E3','G3']],
+  4:[['A3','G3','A3','C4','E4','C4','A3','G3'],['A3','E3','G3','E3']],
+  5:[['G3','A3','C4','A3','G3','E3','G3','A3'],['C3','E3','G3','C3']],
+};
+function initAudio(){
+  if(audio.ctx)return;
+  const AC=window.AudioContext||window.webkitAudioContext;
+  if(!AC)return;
+  audio.ctx=new AC();audio.master=audio.ctx.createGain();
+  audio.master.gain.value=.05;audio.master.connect(audio.ctx.destination);
+}
+function tone(freq,dur=.12,type='square',vol=.5,delay=0){
+  if(!audio.ctx||audio.muted||!freq)return;
+  const t=audio.ctx.currentTime+delay;
+  const osc=audio.ctx.createOscillator(),gain=audio.ctx.createGain();
+  osc.type=type;osc.frequency.setValueAtTime(freq,t);
+  gain.gain.setValueAtTime(.0001,t);gain.gain.exponentialRampToValueAtTime(vol,t+.01);
+  gain.gain.exponentialRampToValueAtTime(.0001,t+dur);
+  osc.connect(gain);gain.connect(audio.master);osc.start(t);osc.stop(t+dur+.03);
+}
+function bgmStep(){
+  if(!audio.ctx||audio.muted||!game||game._ended)return;
+  const seq=BGM[game.phase]||BGM[1];const i=audio.step++;
+  tone(NOTE[seq[0][i%seq[0].length]],.11,'square',.30);
+  if(i%2===0)tone(NOTE[seq[1][Math.floor(i/2)%seq[1].length]],.16,'triangle',.18);
+}
+function startBgm(){if(audio.timer)clearInterval(audio.timer);audio.step=0;audio.timer=setInterval(bgmStep,180);}
+function toggleAudio(){
+  initAudio();if(!audio.ctx)return;
+  if(audio.ctx.state==='suspended')audio.ctx.resume();
+  audio.muted=!audio.muted;
+  $('audio-btn').textContent=audio.muted?'♪ 音ON':'♪ 音OFF';
+  if(!audio.muted){playJingle('start');startBgm();}
+}
+function playJingle(kind){
+  if(!audio.ctx||audio.muted)return;
+  if(kind==='win') ['A3','C4','E4','A4'].forEach((n,i)=>tone(NOTE[n],.12,'square',.42,i*.09));
+  else if(kind==='loss') ['A3','G3','E3','C3'].forEach((n,i)=>tone(NOTE[n],.14,'square',.40,i*.11));
+  else if(kind==='year') ['C4','E4','A4','E4','C4'].forEach((n,i)=>tone(NOTE[n],.12,'triangle',.38,i*.1));
+  else if(kind==='dip')  ['E4','A4','E4'].forEach((n,i)=>tone(NOTE[n],.10,'square',.32,i*.1));
+  else if(kind==='ezo')  ['C4','D4','E4','G4'].forEach((n,i)=>tone(NOTE[n],.14,'triangle',.35,i*.12));
+  else ['C4','E4','G4'].forEach((n,i)=>tone(NOTE[n],.09,'square',.30,i*.08));
+}
+function clickSE(){if(!audio.ctx||audio.muted)return;tone(NOTE.E5,.03,'square',.14);}
+document.addEventListener('pointerdown',()=>{if(!audio.started){audio.started=true;initAudio();}},{once:true});
+
+const _nextPhase=nextPhase;
+nextPhase=function(doRender=true){const b=game?game.phase:-1;_nextPhase(doRender);clickSE();if(!audio.muted&&game&&b!==game.phase)startBgm();};
+const _showBattle=showBattle;
+showBattle=function(a,d,won,text){_showBattle(a,d,won,text);playJingle(won?'win':'loss');};
+const _ally=ally;ally=function(){playJingle('dip');_ally();};
+const _submit=submit;submit=function(){playJingle('dip');_submit();};
+
+/* ── 起動 ─────────────────────────── */
+newGame();
+</script>
+</body>
+</html>
